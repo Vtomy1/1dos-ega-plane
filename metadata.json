@@ -1,0 +1,6 @@
+{
+  "name": "DOS Graphics Studio: EXE Header & QBasic EGA 4-Plane Converter",
+  "description": "Convert images to authentic MS-DOS MZ .EXE and .COM executables, 8-bit 320x200 dithered graphics, and QBasic binary EGA 4-plane loader and saver code.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
