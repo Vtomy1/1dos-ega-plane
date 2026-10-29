@@ -117,6 +117,163 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
   ];
 }
 
+// Helper color conversion functions
+export function rgbToHex(r: number, g: number, b: number): string {
+  const toHex = (v: number) => Math.min(255, Math.max(0, Math.round(v))).toString(16).padStart(2, '0').toUpperCase();
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+export function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  const clean = hex.replace('#', '').trim();
+  if (clean.length === 3) {
+    const r = parseInt(clean[0] + clean[0], 16);
+    const g = parseInt(clean[1] + clean[1], 16);
+    const b = parseInt(clean[2] + clean[2], 16);
+    if (isNaN(r) || isNaN(g) || isNaN(b)) return null;
+    return { r, g, b };
+  }
+  if (clean.length === 6) {
+    const r = parseInt(clean.substring(0, 2), 16);
+    const g = parseInt(clean.substring(2, 4), 16);
+    const b = parseInt(clean.substring(4, 6), 16);
+    if (isNaN(r) || isNaN(g) || isNaN(b)) return null;
+    return { r, g, b };
+  }
+  return null;
+}
+
+// Convert 8-bit RGB (0-255) to authentic MS-DOS VGA 6-bit DAC register value (0-63)
+export function rgbToDac6Bit(val: number): number {
+  return Math.min(63, Math.max(0, Math.floor(val / 4)));
+}
+
+// Convert 6-bit DAC register value (0-63) to 8-bit RGB (0-255) with MSB replication
+export function dac6BitToRgb(dac: number): number {
+  const clamped = Math.min(63, Math.max(0, dac));
+  return (clamped << 2) | (clamped >> 4);
+}
+
+export function clonePalette(palette: RgbColor[]): RgbColor[] {
+  return palette.map((c) => ({ ...c }));
+}
+
+// Curated 16-color Historic Retro Palettes
+export const RETRO_16_PRESETS: { id: string; name: string; description: string; colors: RgbColor[] }[] = [
+  {
+    id: 'standard_ega',
+    name: 'IBM EGA Standard',
+    description: 'Classic 1984 16-color hardware default (SCREEN 7 / Mode 0Dh)',
+    colors: EGA_16_PALETTE,
+  },
+  {
+    id: 'c64_pepto',
+    name: 'Commodore 64 (VIC-II)',
+    description: 'Warm, muted earthy palette from the legendary 8-bit computer',
+    colors: [
+      { index: 0,  r: 0,   g: 0,   b: 0,   name: 'Black', hex: '#000000' },
+      { index: 1,  r: 255, g: 255, b: 255, name: 'White', hex: '#FFFFFF' },
+      { index: 2,  r: 136, g: 0,   b: 0,   name: 'Red', hex: '#880000' },
+      { index: 3,  r: 170, g: 255, b: 238, name: 'Cyan', hex: '#AAFFEE' },
+      { index: 4,  r: 204, g: 68,  b: 204, name: 'Violet', hex: '#CC44CC' },
+      { index: 5,  r: 0,   g: 204, b: 85,  name: 'Green', hex: '#00CC55' },
+      { index: 6,  r: 0,   g: 0,   b: 170, name: 'Blue', hex: '#0000AA' },
+      { index: 7,  r: 238, g: 238, b: 119, name: 'Yellow', hex: '#EEEE77' },
+      { index: 8,  r: 221, g: 136, b: 85,  name: 'Orange', hex: '#DD8855' },
+      { index: 9,  r: 102, g: 68,  b: 0,   name: 'Brown', hex: '#664400' },
+      { index: 10, r: 255, g: 119, b: 119, name: 'Light Red', hex: '#FF7777' },
+      { index: 11, r: 51,  g: 51,  b: 51,  name: 'Dark Grey', hex: '#333333' },
+      { index: 12, r: 119, g: 119, b: 119, name: 'Grey', hex: '#777777' },
+      { index: 13, r: 170, g: 255, b: 102, name: 'Light Green', hex: '#AAFF66' },
+      { index: 14, r: 0,   g: 136, b: 255, name: 'Light Blue', hex: '#0088FF' },
+      { index: 15, r: 187, g: 187, b: 187, name: 'Light Grey', hex: '#BBBBBB' },
+    ],
+  },
+  {
+    id: 'cyberpunk_neon',
+    name: 'Cyberpunk Neon',
+    description: 'High-contrast electric magenta, cyan, deep purples, and lasers',
+    colors: [
+      { index: 0,  r: 10,  g: 8,   b: 24,  name: 'Void Navy', hex: '#0A0818' },
+      { index: 1,  r: 18,  g: 22,  b: 62,  name: 'Deep Abyss', hex: '#12163E' },
+      { index: 2,  r: 58,  g: 12,  b: 84,  name: 'Neon Violet', hex: '#3A0C54' },
+      { index: 3,  r: 138, g: 14,  b: 104, name: 'Hot Plum', hex: '#8A0E68' },
+      { index: 4,  r: 224, g: 24,  b: 120, name: 'Laser Magenta', hex: '#E01878' },
+      { index: 5,  r: 255, g: 78,  b: 168, name: 'Hot Pink', hex: '#FF4EA8' },
+      { index: 6,  r: 16,  g: 64,  b: 92,  name: 'Dark Teal', hex: '#10405C' },
+      { index: 7,  r: 0,   g: 140, b: 170, name: 'Electric Cyan', hex: '#008CAA' },
+      { index: 8,  r: 0,   g: 224, b: 236, name: 'Neon Aqua', hex: '#00E0EC' },
+      { index: 9,  r: 96,  g: 255, b: 240, name: 'Bright Mint', hex: '#60FFF0' },
+      { index: 10, r: 24,  g: 180, b: 90,  name: 'Matrix Green', hex: '#18B45A' },
+      { index: 11, r: 220, g: 255, b: 40,  name: 'Toxic Lime', hex: '#DCFF28' },
+      { index: 12, r: 255, g: 140, b: 20,  name: 'Plasma Orange', hex: '#FF8C14' },
+      { index: 13, r: 255, g: 220, b: 64,  name: 'Electric Yellow', hex: '#FFDC40' },
+      { index: 14, r: 180, g: 190, b: 240, name: 'Synth Ice', hex: '#B4BEF0' },
+      { index: 15, r: 255, g: 255, b: 255, name: 'Pure White', hex: '#FFFFFF' },
+    ],
+  },
+  {
+    id: 'sierra_fantasy',
+    name: 'Sierra Quest (Fantasy)',
+    description: 'Rich organic stone, royal gold, foliage, and twilight blues',
+    colors: [
+      { index: 0,  r: 12,  g: 14,  b: 18,  name: 'Abyssal Black', hex: '#0C0E12' },
+      { index: 1,  r: 28,  g: 36,  b: 54,  name: 'Midnight Slate', hex: '#1C2436' },
+      { index: 2,  r: 44,  g: 64,  b: 96,  name: 'Dusk Cobalt', hex: '#2C4060' },
+      { index: 3,  r: 72,  g: 104, b: 144, name: 'Royal Steel', hex: '#486890' },
+      { index: 4,  r: 28,  g: 54,  b: 36,  name: 'Dark Forest', hex: '#1C3624' },
+      { index: 5,  r: 52,  g: 94,  b: 58,  name: 'Castle Moss', hex: '#345E3A' },
+      { index: 6,  r: 96,  g: 144, b: 84,  name: 'Valley Sage', hex: '#609054' },
+      { index: 7,  r: 160, g: 196, b: 120, name: 'Meadow Light', hex: '#A0C478' },
+      { index: 8,  r: 64,  g: 40,  b: 28,  name: 'Ancient Bark', hex: '#40281C' },
+      { index: 9,  r: 112, g: 68,  b: 44,  name: 'Fortress Timber', hex: '#70442C' },
+      { index: 10, r: 168, g: 108, b: 64,  name: 'Clay Earth', hex: '#A86C40' },
+      { index: 11, r: 216, g: 156, b: 88,  name: 'Crown Gold', hex: '#D89C58' },
+      { index: 12, r: 248, g: 212, b: 136, name: 'Torchlight', hex: '#F8D488' },
+      { index: 13, r: 140, g: 40,  b: 52,  name: 'Crimson Velvet', hex: '#8C2834' },
+      { index: 14, r: 196, g: 80,  b: 92,  name: 'Rose Shield', hex: '#C4505C' },
+      { index: 15, r: 248, g: 244, b: 236, name: 'Parchment White', hex: '#F8F4EC' },
+    ],
+  },
+  {
+    id: 'amber_phosphor',
+    name: 'Amber Monochrome CRT',
+    description: '16 shades of warm glowing amber phosphor CRT display',
+    colors: Array.from({ length: 16 }, (_, i) => {
+      const step = i / 15;
+      const r = Math.round(step * 255);
+      const g = Math.round(step * 170);
+      const b = Math.round(step * 30);
+      return {
+        index: i,
+        r,
+        g,
+        b,
+        name: `Amber Tone ${i}`,
+        hex: rgbToHex(r, g, b),
+      };
+    }),
+  },
+  {
+    id: 'green_matrix',
+    name: 'Green Terminal CRT',
+    description: '16 shades of vintage P1 green phosphor terminal',
+    colors: Array.from({ length: 16 }, (_, i) => {
+      const step = i / 15;
+      const r = Math.round(step * 40);
+      const g = Math.round(step * 255);
+      const b = Math.round(step * 60);
+      return {
+        index: i,
+        r,
+        g,
+        b,
+        name: `Green Tone ${i}`,
+        hex: rgbToHex(r, g, b),
+      };
+    }),
+  },
+];
+
 // Perceptual distance formula (weighted Euclidean approximating human eye sensitivity)
 export function colorDistanceSq(
   r1: number, g1: number, b1: number,
