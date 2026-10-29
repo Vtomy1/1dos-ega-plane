@@ -26,18 +26,24 @@ export const Header: React.FC<HeaderProps> = ({ onQuickExport, hasImage }) => {
         </div>
 
         {/* Zone 2: Navigation / Format links */}
-        <nav className="hidden md:flex items-center gap-6 text-xs text-neutral-400 font-medium">
+        <nav className="hidden lg:flex items-center gap-5 text-xs text-neutral-400 font-medium">
           <a href="#canvas-viewport" className="hover:text-neutral-100 transition-colors">
             320x200 Canvas
           </a>
+          <a href="#palette-editor-section" className="hover:text-neutral-100 transition-colors">
+            Palette Editor
+          </a>
+          <a href="#batch-converter-section" className="hover:text-neutral-100 transition-colors">
+            Batch ZIP
+          </a>
           <a href="#mz-header-section" className="hover:text-neutral-100 transition-colors">
-            MZ Header Inspector
+            MZ Header
           </a>
           <a href="#qbasic-section" className="hover:text-neutral-100 transition-colors">
-            QBasic Binary Code
+            QBasic Code
           </a>
           <a href="#dos-terminal" className="hover:text-neutral-100 transition-colors">
-            DOS Terminal Runner
+            DOS Terminal
           </a>
         </nav>
 

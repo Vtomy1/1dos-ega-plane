@@ -12,6 +12,7 @@ export interface ImageProcessingOptions {
   targetWidth?: number; // default 320
   targetHeight?: number; // default 200
   serpentine?: boolean;
+  customPalette?: RgbColor[];
 }
 
 // 4x4 Bayer Matrix
@@ -142,7 +143,9 @@ export function quantizeAndDither(
   palette: RgbColor[];
 } {
   const { width, height, data } = imageData;
-  const palette = getPaletteForMode(options.mode);
+  const palette = options.customPalette && options.customPalette.length > 0
+    ? options.customPalette
+    : getPaletteForMode(options.mode);
   const colorIndices = new Uint8Array(width * height);
   const rgbPixels = new Uint8ClampedArray(width * height * 4);
   const strength = options.strength;

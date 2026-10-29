@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useCallback, useTransition } from 'react';
-import { AspectRatioMode, ConversionResult, DitherAlgorithm, GraphicMode } from './types/dos';
+import React, { useState, useEffect, useCallback, useTransition, useMemo } from 'react';
+import { AspectRatioMode, ConversionResult, DitherAlgorithm, GraphicMode, RgbColor } from './types/dos';
 import { Header } from './components/Header';
 import { ImageUploader } from './components/ImageUploader';
 import { ConversionControls } from './components/ConversionControls';
 import { CrtPreview } from './components/CrtPreview';
+import { PaletteEditor } from './components/PaletteEditor';
+import { BatchConverter } from './components/BatchConverter';
 import { ExeHeaderInspector } from './components/ExeHeaderInspector';
 import { QBasicCodeViewer } from './components/QBasicCodeViewer';
 import { ExportPanel } from './components/ExportPanel';
@@ -13,6 +15,7 @@ import { createQBasicBsaveBuffer, encodeEga4Planes } from './utils/egaPlanes';
 import { buildDosExecutable } from './utils/dosExeBuilder';
 import { generateQBasicCodeSamples } from './utils/qbasicGenerator';
 import { downloadBinaryFile, downloadTextFile } from './utils/fileDownloader';
+import { clonePalette, EGA_16_PALETTE } from './utils/palettes';
 
 export default function App() {
   const [currentImage, setCurrentImage] = useState<HTMLImageElement | null>(null);
@@ -28,6 +31,12 @@ export default function App() {
   const [gamma, setGamma] = useState<number>(1.0);
   const [aspectMode, setAspectMode] = useState<AspectRatioMode>('fit_letterbox');
   const [serpentine, setSerpentine] = useState<boolean>(true);
+
+  // 16-Color Palette Customization
+  const [customPalette, setCustomPalette] = useState<RgbColor[]>(clonePalette(EGA_16_PALETTE));
+  const [selectedPaletteIndex, setSelectedPaletteIndex] = useState<number>(0);
+  const [autoReDither, setAutoReDither] = useState<boolean>(false);
+  const [highlightColorIndex, setHighlightColorIndex] = useState<number | null>(null);
 
   // Conversion Result
   const [result, setResult] = useState<ConversionResult | null>(null);
@@ -45,8 +54,8 @@ export default function App() {
     img.src = '/src/assets/images/dos_cyberpunk_city_1790301713205.jpg';
   }, []);
 
-  // Process image whenever inputs change
-  const processConversion = useCallback(() => {
+  // Process image conversion
+  const processConversion = useCallback((paletteToUse?: RgbColor[]) => {
     if (!currentImage) return;
 
     startTransition(() => {
@@ -63,6 +72,9 @@ export default function App() {
         aspectMode
       );
 
+      // Active palette to use
+      const activePal = paletteToUse || customPalette;
+
       // 2. Quantize and dither
       const { colorIndices, rgbPixels, palette } = quantizeAndDither(resampledData, {
         mode,
@@ -73,6 +85,7 @@ export default function App() {
         gamma,
         aspectMode,
         serpentine,
+        customPalette: activePal,
       });
 
       // 3. EGA 4-Plane conversion (if applicable)
@@ -111,11 +124,76 @@ export default function App() {
         bsaveBuffer,
       });
     });
-  }, [currentImage, mode, dither, strength, brightness, contrast, gamma, aspectMode, serpentine]);
+  }, [currentImage, mode, dither, strength, brightness, contrast, gamma, aspectMode, serpentine, customPalette]);
 
   useEffect(() => {
     processConversion();
   }, [processConversion]);
+
+  // Color frequency map for current image
+  const colorCounts = useMemo(() => {
+    if (!result) return new Map<number, number>();
+    const counts = new Map<number, number>();
+    for (let i = 0; i < result.colorIndices.length; i++) {
+      const c = result.colorIndices[i];
+      counts.set(c, (counts.get(c) || 0) + 1);
+    }
+    return counts;
+  }, [result]);
+
+  // Real-Time Palette Update Handler
+  const handlePaletteChange = (newPalette: RgbColor[], immediateOnly: boolean = false) => {
+    setCustomPalette(newPalette);
+
+    if (immediateOnly && result) {
+      // 60fps Real-Time Hardware DAC swap:
+      // Update pixel colors in the canvas buffer without recalculating dithering
+      const updatedRgbPixels = new Uint8ClampedArray(result.rgbPixels.length);
+      const numPixels = result.colorIndices.length;
+
+      for (let i = 0; i < numPixels; i++) {
+        const cIdx = result.colorIndices[i];
+        const color = newPalette[cIdx] || newPalette[cIdx % newPalette.length];
+        const pOff = i * 4;
+        updatedRgbPixels[pOff] = color.r;
+        updatedRgbPixels[pOff + 1] = color.g;
+        updatedRgbPixels[pOff + 2] = color.b;
+        updatedRgbPixels[pOff + 3] = 255;
+      }
+
+      // Update executable with new DAC palette registers
+      const paletteRgbList = newPalette.map((p) => [p.r, p.g, p.b] as [number, number, number]);
+      const exePayload = result.egaPlanes ? result.egaPlanes.combined : result.colorIndices;
+      const exeBuild = buildDosExecutable(mode, exePayload, paletteRgbList);
+
+      setResult((prev) =>
+        prev
+          ? {
+              ...prev,
+              rgbPixels: updatedRgbPixels,
+              palette: newPalette,
+              exeBuffer: exeBuild.exeBuffer,
+              comBuffer: exeBuild.comBuffer,
+              exeHeader: exeBuild.header,
+            }
+          : null
+      );
+      setAsmSource(exeBuild.asmSource);
+    } else {
+      // Full re-dither with the new palette colors
+      processConversion(newPalette);
+    }
+  };
+
+  const handleResetPalette = () => {
+    const defaultPal = clonePalette(EGA_16_PALETTE);
+    setCustomPalette(defaultPal);
+    processConversion(defaultPal);
+  };
+
+  const handleTriggerReDither = () => {
+    processConversion(customPalette);
+  };
 
   const handleImageLoaded = (img: HTMLImageElement, name: string) => {
     setCurrentImage(img);
@@ -175,7 +253,7 @@ export default function App() {
               MS-DOS Executable & QBasic EGA 4-Plane Converter
             </h1>
             <p className="text-xs text-neutral-400 mt-1 max-w-3xl leading-relaxed">
-              Transform standard images into authentic 16-bit MS-DOS MZ <code className="font-mono text-amber-400">.EXE</code> / <code className="font-mono text-amber-400">.COM</code> executables, hardware 320x200 dithered bitplanes, and complete QBasic <code className="font-mono text-amber-400">OPEN ... FOR BINARY</code> EGA 4-plane loader & saver code.
+              Transform images into authentic 16-bit MS-DOS MZ <code className="font-mono text-amber-400">.EXE</code> / <code className="font-mono text-amber-400">.COM</code> executables, hardware 320x200 dithered bitplanes, QBasic <code className="font-mono text-amber-400">OPEN ... FOR BINARY</code> EGA code, and batch ZIP archives.
             </p>
           </div>
 
@@ -217,7 +295,35 @@ export default function App() {
           </div>
         </div>
 
-        {/* Section 3: MS-DOS MZ Executable Header Inspector */}
+        {/* Section 3: Interactive 16-Color EGA/VGA Palette Editor */}
+        <div id="palette-editor-section">
+          <PaletteEditor
+            palette={customPalette}
+            onPaletteChange={handlePaletteChange}
+            onResetToDefault={handleResetPalette}
+            colorCounts={colorCounts}
+            selectedColorIndex={selectedPaletteIndex}
+            onSelectColorIndex={setSelectedPaletteIndex}
+            autoReDither={autoReDither}
+            onToggleAutoReDither={setAutoReDither}
+            onTriggerReDither={handleTriggerReDither}
+            highlightColorIndex={highlightColorIndex}
+            onToggleHighlightColor={setHighlightColorIndex}
+          />
+        </div>
+
+        {/* Section 4: Batch Image to MS-DOS Executable ZIP Utility */}
+        <div id="batch-converter-section">
+          <BatchConverter
+            currentMode={mode}
+            currentDither={dither}
+            currentStrength={strength}
+            currentAspectMode={aspectMode}
+            customPalette={customPalette}
+          />
+        </div>
+
+        {/* Section 5: MS-DOS MZ Executable Header Inspector */}
         <ExeHeaderInspector
           header={result?.exeHeader || null}
           exeBuffer={result?.exeBuffer || null}
@@ -227,7 +333,7 @@ export default function App() {
           onDownloadCom={handleDownloadCom}
         />
 
-        {/* Section 4: QBasic EGA 4-Plane Binary Loader and Saver */}
+        {/* Section 6: QBasic EGA 4-Plane Binary Loader and Saver */}
         <QBasicCodeViewer
           samples={qbasicSamples}
           onDownloadBas={handleDownloadBas}
@@ -235,10 +341,10 @@ export default function App() {
           egaFileSize={result?.egaPlanes?.combined.length || 32000}
         />
 
-        {/* Section 5: Interactive Virtual MS-DOS Terminal Simulator */}
+        {/* Section 7: Interactive Virtual MS-DOS Terminal Simulator */}
         <VirtualDosRunner result={result} fileName={currentFileName} />
 
-        {/* Section 6: Comprehensive Binary Export Center */}
+        {/* Section 8: Comprehensive Binary Export Center */}
         <ExportPanel result={result} baseFileName={currentFileName} />
       </main>
 
