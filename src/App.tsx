@@ -291,7 +291,14 @@ export default function App() {
 
           {/* Section 2: CRT Monitor Preview & Bitplane Inspector */}
           <div className="lg:col-span-7">
-            <CrtPreview result={result} isLoading={isPending} />
+            <CrtPreview
+              result={result}
+              isLoading={isPending}
+              selectedColorIndex={selectedPaletteIndex}
+              onSelectColorIndex={setSelectedPaletteIndex}
+              highlightColorIndex={highlightColorIndex}
+              onToggleHighlightColor={setHighlightColorIndex}
+            />
           </div>
         </div>
 

@@ -5,15 +5,29 @@ import { Monitor, ZoomIn, Eye, Sparkles, Check, Info } from 'lucide-react';
 interface CrtPreviewProps {
   result: ConversionResult | null;
   isLoading: boolean;
+  selectedColorIndex?: number;
+  onSelectColorIndex?: (index: number) => void;
+  highlightColorIndex?: number | null;
+  onToggleHighlightColor?: (index: number | null) => void;
 }
 
-export const CrtPreview: React.FC<CrtPreviewProps> = ({ result, isLoading }) => {
+export const CrtPreview: React.FC<CrtPreviewProps> = ({
+  result,
+  isLoading,
+  selectedColorIndex,
+  onSelectColorIndex,
+  highlightColorIndex: propHighlight,
+  onToggleHighlightColor: propOnToggleHighlight,
+}) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [enableScanlines, setEnableScanlines] = useState(true);
   const [aspectCrt43, setAspectCrt43] = useState(true);
   const [zoomLevel, setZoomLevel] = useState<number>(2); // 1x, 2x, 3x, 4x
   const [inspectedPixel, setInspectedPixel] = useState<PixelInspection | null>(null);
-  const [highlightColorIndex, setHighlightColorIndex] = useState<number | null>(null);
+  const [localHighlight, setLocalHighlight] = useState<number | null>(null);
+
+  const highlightColorIndex = propHighlight !== undefined ? propHighlight : localHighlight;
+  const setHighlightColorIndex = propOnToggleHighlight || setLocalHighlight;
 
   // Draw 320x200 canvas
   useEffect(() => {
@@ -283,14 +297,22 @@ export const CrtPreview: React.FC<CrtPreviewProps> = ({ result, isLoading }) => 
           <div className="flex flex-wrap gap-1">
             {result.palette.slice(0, 32).map((col) => {
               const count = colorCounts.get(col.index) || 0;
-              const isSelected = highlightColorIndex === col.index;
+              const isSelected = selectedColorIndex === col.index;
+              const isHighlighted = highlightColorIndex === col.index;
               return (
                 <button
                   key={col.index}
-                  onClick={() => setHighlightColorIndex(isSelected ? null : col.index)}
-                  title={`${col.name || `Color ${col.index}`}: ${count} pixels (Click to isolate)`}
-                  className={`w-6 h-6 rounded-xs border transition-transform relative group ${
-                    isSelected ? 'ring-2 ring-amber-400 scale-110 z-10' : 'border-neutral-700/80 hover:scale-105'
+                  onClick={() => {
+                    if (onSelectColorIndex) onSelectColorIndex(col.index);
+                    setHighlightColorIndex(isHighlighted ? null : col.index);
+                  }}
+                  title={`${col.name || `Color ${col.index}`}: ${count} pixels (Click to select & isolate)`}
+                  className={`w-6 h-6 rounded-xs border transition-transform relative group cursor-pointer ${
+                    isSelected
+                      ? 'ring-2 ring-amber-400 scale-110 z-10'
+                      : isHighlighted
+                      ? 'ring-2 ring-sky-400 scale-105 z-10'
+                      : 'border-neutral-700/80 hover:scale-105'
                   }`}
                   style={{ backgroundColor: col.hex }}
                 >
